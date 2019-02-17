@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using Amazon.S3;
 using Amazon.S3.Model;
 using CommandLine;
-using HeyRed.Mime;
+using MimeTypes.Core;
 
 namespace SyncByHash
 {
@@ -106,11 +106,8 @@ namespace SyncByHash
             {
                 foreach (var (filePath, key) in fileKeyPairsToUpload)
                 {
-                    // Use a MIME guesser to guess our file type.
-                    var mimeType = MimeGuesser.GuessMimeType(filePath);
-
-                    if (string.IsNullOrEmpty(mimeType))
-                        Console.WriteLine($"Could not determine MIME type for file '{filePath}'.");
+                    // Try to get a MIME type for the given extension. Defaults to "application/octet-stream".
+                    var mimeType = MimeTypeMap.GetMimeType(Path.GetExtension(filePath));
 
                     // Build a request to upload this file.
                     var putRequest = new PutObjectRequest
