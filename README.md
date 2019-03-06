@@ -6,3 +6,8 @@ file contents on the bucket (available via the ETag from S3) to the hash of the 
 to avoid this issue.
 
 This is a work-in-progress for personal use.
+
+## Build for Release
+The tool can be run with the `dotnet` command or by compiling it to an exe.
+
+    dotnet publish -c Release -r win10-x64
