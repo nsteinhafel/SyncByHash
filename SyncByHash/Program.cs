@@ -37,10 +37,10 @@ namespace SyncByHash
             try
             {
                 // Get map of keys to hashes in the bucket.
-                var keyToHash = await GetKeysToHashesFromBucket(client, opts.Bucket);
+                var keyToHash = await GetKeysToHashesFromBucket(client, opts.Bucket, opts.Prefix, opts.Delimiter);
 
                 // Get file-key pairs.
-                var fileKeyPairsToUpload = GetFileKeyPairsToUpload(path, keyToHash, opts.Force);
+                var fileKeyPairsToUpload = GetFileKeyPairsToUpload(path, keyToHash, opts.Prefix, opts.Force);
 
                 // Upload files.
                 await UploadFiles(client, opts.Bucket, fileKeyPairsToUpload, opts.DryRun);
@@ -141,10 +141,11 @@ namespace SyncByHash
         /// </summary>
         /// <param name="path">Path.</param>
         /// <param name="keyToHash">Map of keys to hashes.</param>
+        /// <param name="prefix">Prefix (if any)</param>
         /// <param name="force">Force upload?</param>
         /// <returns>File-key pairs to upload.</returns>
         private static ICollection<Tuple<string, string>> GetFileKeyPairsToUpload(string path,
-            IDictionary<string, string> keyToHash, bool force)
+            IDictionary<string, string> keyToHash, string prefix = null, bool force = false)
         {
             var fileKeyPairsToUpload = new List<Tuple<string, string>>();
 
@@ -152,7 +153,7 @@ namespace SyncByHash
             foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
             {
                 // Normalize Windows paths to S3 keys.
-                var key = Path.GetRelativePath(path, file).Replace('\\', '/');
+                var key = $"{prefix}{Path.GetRelativePath(path, file).Replace('\\', '/')}";
 
                 // Force upload?
                 if (force ||
@@ -169,9 +170,11 @@ namespace SyncByHash
         /// <summary>Get a mapping of keys to file hashes from the S3 bucket.</summary>
         /// <param name="client">S3 client.</param>
         /// <param name="bucket">Bucket.</param>
+        /// <param name="prefix">Prefix (if any).</param>
+        /// <param name="delimiter">Delimiter (if any).</param>
         /// <returns>Map of keys to hashes.</returns>
         private static async Task<IDictionary<string, string>> GetKeysToHashesFromBucket(IAmazonS3 client,
-            string bucket)
+            string bucket, string prefix = null, string delimiter = null)
         {
             var keyToHash = new Dictionary<string, string>();
             string continuationToken = null;
@@ -180,6 +183,8 @@ namespace SyncByHash
                 var listRequest = new ListObjectsV2Request
                 {
                     BucketName = bucket,
+                    Prefix = prefix,
+                    Delimiter = delimiter,
                     ContinuationToken = continuationToken
                 };
 

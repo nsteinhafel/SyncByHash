@@ -10,7 +10,7 @@ namespace SyncByHash
         public string Root { get; set; }
 
         /// <summary>S3 Bucket to sync.</summary>
-        [Value(1, MetaName = "bucket", Required = true, HelpText = "S3 Bucket to sync.")]
+        [Value(1, MetaName = "bucket", Required = true, HelpText = "S3 bucket to sync.")]
         public string Bucket { get; set; }
 
         /// <summary>Delete objects not found in the root folder.</summary>
@@ -25,5 +25,13 @@ namespace SyncByHash
         /// <summary>Force upload of all files regardless of change status.</summary>
         [Option('f', "force", Required = false, HelpText = "Force upload of all files regardless of change status.")]
         public bool Force { get; set; }
+
+        /// <summary>Prefix for S3 bucket.</summary>
+        [Option("prefix", Required = false, HelpText = "Prefix for S3 bucket.")]
+        public string Prefix { get; set; }
+
+        /// <summary>Delimiter for S3 bucket.</summary>
+        [Option("delimiter", Required = false, HelpText = "Delimiter for S3 bucket.")]
+        public string Delimiter { get; set; }
     }
 }
