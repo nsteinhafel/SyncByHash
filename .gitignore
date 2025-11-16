@@ -8,6 +8,7 @@ nupkg/
 # Editor folders
 .vs
 .vscode
+.idea
 
 # User-specific files
 *.suo

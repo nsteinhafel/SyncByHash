@@ -1,15 +1,37 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
-  </PropertyGroup>
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <AssemblyName>syncbyhash</AssemblyName>
+        <RootNamespace>SyncByHash</RootNamespace>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>latest</LangVersion>
 
-  <ItemGroup>
-    <PackageReference Include="AWSSDK.Core" Version="3.3.32" />
-    <PackageReference Include="AWSSDK.S3" Version="3.3.31.21" />
-    <PackageReference Include="CommandLineParser" Version="2.4.3" />
-    <PackageReference Include="MimeTypeMap.Core" Version="1.0.0" />
-  </ItemGroup>
+        <!-- NativeAOT Configuration -->
+        <PublishAot>true</PublishAot>
+        <OptimizationPreference>Size</OptimizationPreference>
+        <InvariantGlobalization>false</InvariantGlobalization>
+        <IlcOptimizationPreference>Size</IlcOptimizationPreference>
+        <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+
+        <!-- Trimming Configuration -->
+        <PublishTrimmed>true</PublishTrimmed>
+        <TrimMode>full</TrimMode>
+        <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="AWSSDK.Core" Version="4.0.3.1" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.11.3" />
+        <PackageReference Include="System.CommandLine" Version="2.0.0" />
+        <PackageReference Include="System.CommandLine.Hosting" Version="0.4.0-alpha.25277.114"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.*"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.*"/>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.*"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.*"/>
+        <PackageReference Include="MimeTypeMap.Core" Version="1.0.0"/>
+    </ItemGroup>
 
 </Project>
