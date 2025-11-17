@@ -1,113 +1,130 @@
-﻿using System.Net;
-using Amazon.S3;
+using System.Net;
 using Amazon.S3.Model;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
+using static SyncByHash.Tests.TestDataBuilders;
 
 namespace SyncByHash.Tests;
 
+/// <summary>
+///     Tests for Sync method.
+///     Uses FileSystemTestFixture for directory isolation and TestDataBuilders for test data.
+/// </summary>
 public partial class SyncByHashTests
 {
+    #region Sync Tests
+
     [Theory]
     [InlineData(null, null)]
     [InlineData(null, "bucket")]
     [InlineData("root", null)]
-    public async Task Sync_Invalid_OptionsRequiredNull(string? root, string? bucket)
+    public async Task Sync_OptionsRequiredFieldsNull_ThrowsInvalidOperationException(string? root, string? bucket)
     {
-        var client = new Mock<IAmazonS3>();
-        var service = new SyncByHashService(client.Object, NullLogger<SyncByHashService>.Instance);
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await service.Sync(new Options { Root = root!, Bucket = bucket! }));
+        // Arrange
+        var (service, _) = CreateServiceWithMock();
+        var options = Options().WithRoot(root!).WithBucket(bucket!).Build();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(async () => await service.Sync(options));
     }
 
     [Fact]
-    public async Task Sync_Invalid_ClientNull()
+    public async Task Sync_OptionsRootAbsoluteNonExistent_ThrowsDirectoryNotFoundException()
     {
-        Assert.Throws<ArgumentNullException>(() =>
-            new SyncByHashService(null!, NullLogger<SyncByHashService>.Instance));
+        // Arrange
+        var (service, _) = CreateServiceWithMock();
+        var nonExistentPath = Path.Join(Directory.GetCurrentDirectory(), "this", "path", "is", "invalid");
+        var options = Options()
+            .WithRoot(nonExistentPath)
+            .WithBucket("bucket")
+            .Build();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(async () => await service.Sync(options));
     }
 
     [Fact]
-    public async Task Sync_Invalid_OptionsNull()
+    public async Task Sync_OptionsRootRelativeNonExistent_ThrowsDirectoryNotFoundException()
     {
-        var client = new Mock<IAmazonS3>();
-        var service = new SyncByHashService(client.Object, NullLogger<SyncByHashService>.Instance);
-        await Assert.ThrowsAsync<ArgumentNullException>(async () => await service.Sync(null!));
+        // Arrange
+        var (service, _) = CreateServiceWithMock();
+        var options = Options()
+            .WithRoot(Path.Join(".", "this", "path", "is", "invalid"))
+            .WithBucket("bucket")
+            .Build();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<DirectoryNotFoundException>(async () => await service.Sync(options));
     }
 
     [Fact]
-    public async Task Sync_Invalid_OptionsRootAbsolute()
+    public async Task Sync_S3ListReturnsError_ThrowsException()
     {
-        var client = new Mock<IAmazonS3>();
-        var service = new SyncByHashService(client.Object, NullLogger<SyncByHashService>.Instance);
-        var opts = new Options
-        {
-            Root = Path.Join(Directory.GetCurrentDirectory(),
-                string.Join(Path.DirectorySeparatorChar, "this", "path", "is", "invalid")),
-            Bucket = "bucket"
-        };
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(async () =>
-            await service.Sync(opts));
-    }
-
-    [Fact]
-    public async Task Sync_Invalid_OptionsRootRelative()
-    {
-        var client = new Mock<IAmazonS3>();
-        var service = new SyncByHashService(client.Object, NullLogger<SyncByHashService>.Instance);
-        var opts = new Options
-        {
-            Root = string.Join(Path.DirectorySeparatorChar, ".", "this", "path", "is", "invalid"),
-            Bucket = "bucket"
-        };
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(async () =>
-            await service.Sync(opts));
-    }
-
-    [Fact]
-    public async Task Sync_Invalid_S3Error()
-    {
-        var client = new Mock<IAmazonS3>();
-        client.Setup(x => x.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), default))
-            .Returns(Task.FromResult(new ListObjectsV2Response
+        // Arrange
+        var (service, mockClient) = CreateServiceWithMock();
+        mockClient.Setup(x => x.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), CancellationToken.None))
+            .ReturnsAsync(new ListObjectsV2Response
             {
                 HttpStatusCode = HttpStatusCode.InternalServerError
-            }));
-        var service = new SyncByHashService(client.Object, NullLogger<SyncByHashService>.Instance);
-        var opts = new Options
-        {
-            Root = Directory.GetCurrentDirectory(),
-            Bucket = "bucket"
-        };
-        await Assert.ThrowsAsync<Exception>(async () => await service.Sync(opts));
+            });
+        var options = Options()
+            .WithRoot(Directory.GetCurrentDirectory())
+            .WithBucket("bucket")
+            .Build();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<Exception>(async () => await service.Sync(options));
     }
 
     [Fact]
-    public async Task Sync_Valid_OptionsRootAbsolute()
+    public async Task Sync_ValidOptionsWithAbsolutePath_Succeeds()
     {
-        var client = new Mock<IAmazonS3>().SetupListObjectsV2AsyncWithOkResponse()
+        // Arrange
+        using var fixture = new FileSystemTestFixture();
+        fixture.CreateFile("test.txt", "test content");
+
+        var mockClient = CreateMockS3Client()
+            .SetupListObjectsV2AsyncWithOkResponse()
             .SetupPutObjectAsyncWithOkResponse();
-        var service = new SyncByHashService(client.Object, NullLogger<SyncByHashService>.Instance);
-        var opts = new Options
-        {
-            Root = Directory.GetCurrentDirectory(),
-            Bucket = "bucket"
-        };
-        await service.Sync(opts);
+
+        var service = CreateService(mockClient);
+        var options = Options()
+            .WithRoot(fixture.RootDirectory)
+            .WithBucket("bucket")
+            .Build();
+
+        // Act
+        await service.Sync(options);
+
+        // Assert - no exceptions thrown
     }
 
     [Fact]
-    public async Task Sync_Valid_OptionsRootRelative()
+    public async Task Sync_ValidOptionsWithRelativePath_Succeeds()
     {
-        var client = new Mock<IAmazonS3>().SetupListObjectsV2AsyncWithOkResponse()
+        // Arrange
+        using var fixture = new FileSystemTestFixture();
+        fixture.CreateFile("test.txt", "test content");
+
+        // Create a relative path by going from current directory
+        var currentDir = Directory.GetCurrentDirectory();
+        var relativePath = Path.GetRelativePath(currentDir, fixture.RootDirectory);
+
+        var mockClient = CreateMockS3Client()
+            .SetupListObjectsV2AsyncWithOkResponse()
             .SetupPutObjectAsyncWithOkResponse();
-        var service = new SyncByHashService(client.Object, NullLogger<SyncByHashService>.Instance);
-        var opts = new Options
-        {
-            Root = Directory.GetCurrentDirectory(),
-            Bucket = "bucket"
-        };
-        await service.Sync(opts);
+
+        var service = CreateService(mockClient);
+        var options = Options()
+            .WithRoot(relativePath)
+            .WithBucket("bucket")
+            .Build();
+
+        // Act
+        await service.Sync(options);
+
+        // Assert - no exceptions thrown
     }
+
+    #endregion
 }

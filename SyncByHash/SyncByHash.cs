@@ -1,9 +1,12 @@
-﻿using System.Net;
+using System.Net;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
 using MimeTypes.Core;
+
+[assembly: InternalsVisibleTo("SyncByHash.Tests")]
 
 namespace SyncByHash;
 
@@ -16,8 +19,8 @@ public class SyncByHashService
 
     public SyncByHashService(IAmazonS3 client, ILogger<SyncByHashService> logger)
     {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _client = client;
+        _logger = logger;
     }
 
     /// <summary>Sync the given folder and bucket.</summary>
@@ -25,8 +28,6 @@ public class SyncByHashService
     /// <returns></returns>
     public async Task Sync(Options opts)
     {
-        if (opts == null) throw new ArgumentNullException(nameof(opts));
-
         // 'Root' and 'Bucket' are required.
         if (opts.Root == null)
             throw new InvalidOperationException(string.Format(MissingOption, nameof(opts.Root)));
@@ -69,13 +70,9 @@ public class SyncByHashService
     /// <param name="fileKeyPairsToUpload">File-key pairs to upload.</param>
     /// <param name="dryRun">Dry run?</param>
     /// <returns></returns>
-    private async Task DeleteFiles(string bucket, IDictionary<string, string> keyToHash,
+    internal async Task DeleteFiles(string bucket, IDictionary<string, string> keyToHash,
         IEnumerable<Tuple<string, string>> fileKeyPairsToUpload, bool dryRun)
     {
-        if (bucket == null) throw new ArgumentNullException(nameof(bucket));
-        if (keyToHash == null) throw new ArgumentNullException(nameof(keyToHash));
-        if (fileKeyPairsToUpload == null) throw new ArgumentNullException(nameof(fileKeyPairsToUpload));
-
         // Find the difference between the bucket and the root.
         var keySet = new HashSet<string>(fileKeyPairsToUpload.Select(x => x.Item2));
         var keysToRemove = keyToHash.Keys.Where(x => !keySet.Contains(x)).ToList();
@@ -109,12 +106,9 @@ public class SyncByHashService
     /// <param name="fileKeyPairsToUpload">File-key pairs to upload.</param>
     /// <param name="dryRun">Dry run?</param>
     /// <returns></returns>
-    private async Task UploadFiles(string bucket,
+    internal async Task UploadFiles(string bucket,
         ICollection<Tuple<string, string>> fileKeyPairsToUpload, bool dryRun)
     {
-        if (bucket == null) throw new ArgumentNullException(nameof(bucket));
-        if (fileKeyPairsToUpload == null) throw new ArgumentNullException(nameof(fileKeyPairsToUpload));
-
         if (fileKeyPairsToUpload.Any())
             foreach (var (filePath, key) in fileKeyPairsToUpload)
             {
@@ -156,30 +150,25 @@ public class SyncByHashService
     /// <param name="prefix">Prefix (if any)</param>
     /// <param name="force">Force upload?</param>
     /// <returns>File-key pairs to upload.</returns>
-    private static ICollection<Tuple<string, string>> GetFileKeyPairsToUpload(string path,
+    internal static ICollection<Tuple<string, string>> GetFileKeyPairsToUpload(string path,
         IDictionary<string, string> keyToHash, string? prefix = null, bool force = false)
     {
-        if (path == null) throw new ArgumentNullException(nameof(path));
-        if (keyToHash == null) throw new ArgumentNullException(nameof(keyToHash));
-
         var fileKeyPairsToUpload = new List<Tuple<string, string>>();
 
         // Get all files in folder and sub-folders.
-        using (var md5 = MD5.Create())
+        using var md5 = MD5.Create();
+        foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
         {
-            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
-            {
-                // Normalize Windows paths to S3 keys.
-                var key = $"{prefix}{Path.GetRelativePath(path, file).Replace('\\', '/')}";
+            // Normalize Windows paths to S3 keys.
+            var key = $"{prefix}{Path.GetRelativePath(path, file).Replace('\\', '/')}";
 
-                // Force upload?
-                if (force ||
-                    // Is this a new file?
-                    !keyToHash.ContainsKey(key) ||
-                    // Has this file changed? Compare the hash that S3 has to the local file's hash.
-                    !string.Equals(keyToHash[key], FileContentHash(md5, file), StringComparison.OrdinalIgnoreCase))
-                    fileKeyPairsToUpload.Add(Tuple.Create(file, key));
-            }
+            // Force upload?
+            if (force ||
+                // Is this a new file?
+                !keyToHash.ContainsKey(key) ||
+                // Has this file changed? Compare the hash that S3 has to the local file's hash.
+                !string.Equals(keyToHash[key], FileContentHash(md5, file), StringComparison.OrdinalIgnoreCase))
+                fileKeyPairsToUpload.Add(Tuple.Create(file, key));
         }
 
         return fileKeyPairsToUpload;
@@ -190,11 +179,9 @@ public class SyncByHashService
     /// <param name="prefix">Prefix (if any).</param>
     /// <param name="delimiter">Delimiter (if any).</param>
     /// <returns>Map of keys to hashes.</returns>
-    private async Task<IDictionary<string, string>> GetKeysToHashesFromBucket(
+    internal async Task<IDictionary<string, string>> GetKeysToHashesFromBucket(
         string bucket, string? prefix = null, string? delimiter = null)
     {
-        if (bucket == null) throw new ArgumentNullException(nameof(bucket));
-
         var keyToHash = new Dictionary<string, string>();
         string? continuationToken = null;
         do
@@ -228,14 +215,9 @@ public class SyncByHashService
     /// <param name="md5">MD5 implementation.</param>
     /// <param name="filePath">Path to file.</param>
     /// <returns>MD5 hash.</returns>
-    private static string FileContentHash(MD5 md5, string filePath)
+    internal static string FileContentHash(MD5 md5, string filePath)
     {
-        if (md5 == null) throw new ArgumentNullException(nameof(md5));
-        if (filePath == null) throw new ArgumentNullException(nameof(filePath));
-
-        using (var stream = File.OpenRead(filePath))
-        {
-            return BitConverter.ToString(md5.ComputeHash(stream)).Replace("-", string.Empty);
-        }
+        using var stream = File.OpenRead(filePath);
+        return Convert.ToHexString(md5.ComputeHash(stream));
     }
 }
