@@ -42,16 +42,16 @@ syncbyhash <root-folder> <bucket> [options]
 
 ```bash
 # Basic sync
-syncbyhash ./website my-s3-bucket
+syncbyhash ./folder my-s3-bucket
 
 # Dry run to preview changes
-syncbyhash ./website my-s3-bucket --dry-run
+syncbyhash ./folder my-s3-bucket --dry-run
 
 # Sync with deletion of remote files not in local folder
-syncbyhash ./website my-s3-bucket --delete
+syncbyhash ./folder my-s3-bucket --delete
 
 # Force upload all files
-syncbyhash ./website my-s3-bucket --force
+syncbyhash ./folder my-s3-bucket --force
 
 # Sync to a prefix
 syncbyhash ./dist my-bucket --prefix cdn/v2/

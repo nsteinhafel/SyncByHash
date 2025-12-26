@@ -78,7 +78,7 @@ public static class TestDataBuilders
 
         public List<S3Object> Build()
         {
-            return [.._objects];
+            return [.. _objects];
         }
     }
 

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SyncByHash/SyncByHash.csproj" />
+  <Project Path="SyncByHash.Tests/SyncByHash.Tests.csproj" />
+</Solution>

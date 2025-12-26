@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Amazon.S3.Model;
 using Moq;
 using Xunit;
