@@ -1,9 +1,13 @@
 using System.CommandLine;
+using Amazon.RuntimeDependencies;
 using Amazon.S3;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+using Amazon.SSO;
+using Amazon.SSOOIDC;
 using SyncByHash;
+
+// Register SSO clients for Native AOT support
+GlobalRuntimeDependencyRegistry.Instance.RegisterSSOOIDCClient(() => new AmazonSSOOIDCClient());
+GlobalRuntimeDependencyRegistry.Instance.RegisterSSOClient(() => new AmazonSSOClient());
 
 var rootArgument = new Argument<string>("root")
 {
@@ -15,9 +19,10 @@ var bucketArgument = new Argument<string>("bucket")
     Description = "S3 bucket to sync"
 };
 
-var deleteOption = new Option<bool>("--delete", "-d")
+var deleteOption = new Option<bool>("--delete")
 {
-    Description = "Delete objects not found in the root folder"
+    Description = "Delete objects not found in the root folder",
+    Aliases = { "-d" }
 };
 
 var dryRunOption = new Option<bool>("--dry-run")
@@ -25,9 +30,10 @@ var dryRunOption = new Option<bool>("--dry-run")
     Description = "Perform a dry run and print what would have been done"
 };
 
-var forceOption = new Option<bool>("--force", "-f")
+var forceOption = new Option<bool>("--force")
 {
-    Description = "Force upload of all files regardless of change status"
+    Description = "Force upload of all files regardless of change status",
+    Aliases = { "-f" }
 };
 
 var prefixOption = new Option<string?>("--prefix")
@@ -49,51 +55,29 @@ rootCommand.Options.Add(forceOption);
 rootCommand.Options.Add(prefixOption);
 rootCommand.Options.Add(delimiterOption);
 
-rootCommand.SetAction(async (parseResult, token) =>
+rootCommand.SetAction(async (parseResult, _) =>
 {
-    var root = parseResult.GetValue(rootArgument)!;
-    var bucket = parseResult.GetValue(bucketArgument)!;
-    var delete = parseResult.GetValue(deleteOption);
-    var dryRun = parseResult.GetValue(dryRunOption);
-    var force = parseResult.GetValue(forceOption);
-    var prefix = parseResult.GetValue(prefixOption);
-    var delimiter = parseResult.GetValue(delimiterOption);
-
-    var host = Host.CreateDefaultBuilder(args)
-        .ConfigureServices((context, services) =>
-        {
-            services.AddSingleton<IAmazonS3, AmazonS3Client>();
-            services.AddSingleton<SyncByHashService>();
-        })
-        .ConfigureLogging(logging =>
-        {
-            logging.ClearProviders();
-            logging.AddConsole();
-            logging.SetMinimumLevel(LogLevel.Information);
-        })
-        .Build();
-
-    var service = host.Services.GetRequiredService<SyncByHashService>();
-    var logger = host.Services.GetRequiredService<ILogger<Program>>();
     var options = new Options
     {
-        Root = root,
-        Bucket = bucket,
-        Delete = delete,
-        DryRun = dryRun,
-        Force = force,
-        Prefix = prefix,
-        Delimiter = delimiter
+        Root = parseResult.GetValue(rootArgument)!,
+        Bucket = parseResult.GetValue(bucketArgument)!,
+        Delete = parseResult.GetValue(deleteOption),
+        DryRun = parseResult.GetValue(dryRunOption),
+        Force = parseResult.GetValue(forceOption),
+        Prefix = parseResult.GetValue(prefixOption),
+        Delimiter = parseResult.GetValue(delimiterOption)
     };
 
     try
     {
+        using var client = new AmazonS3Client();
+        var service = new SyncByHashService(client);
         await service.Sync(options);
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Sync failed: {Message}", ex.Message);
-        throw;
+        Console.Error.WriteLine($"Error: {ex.Message}");
+        Environment.Exit(1);
     }
 });
 
