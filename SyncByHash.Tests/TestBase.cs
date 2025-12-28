@@ -1,5 +1,4 @@
 using Amazon.S3;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace SyncByHash.Tests;
@@ -16,9 +15,7 @@ public abstract class TestBase
     /// </summary>
     protected SyncByHashService CreateService(Mock<IAmazonS3> mockClient)
     {
-        return new SyncByHashService(
-            mockClient.Object,
-            NullLogger<SyncByHashService>.Instance);
+        return new SyncByHashService(mockClient.Object);
     }
 
     /// <summary>

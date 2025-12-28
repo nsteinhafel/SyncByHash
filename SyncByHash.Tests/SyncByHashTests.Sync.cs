@@ -17,15 +17,14 @@ public partial class SyncByHashTests
     [Theory]
     [InlineData(null, null)]
     [InlineData(null, "bucket")]
-    [InlineData("root", null)]
-    public async Task Sync_OptionsRequiredFieldsNull_ThrowsInvalidOperationException(string? root, string? bucket)
+    public async Task Sync_OptionsRootNull_ThrowsArgumentNullException(string? root, string? bucket)
     {
         // Arrange
         var (service, _) = CreateServiceWithMock();
         var options = Options().WithRoot(root!).WithBucket(bucket!).Build();
 
         // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await service.Sync(options));
+        await Assert.ThrowsAsync<ArgumentNullException>(async () => await service.Sync(options));
     }
 
     [Fact]
@@ -124,6 +123,105 @@ public partial class SyncByHashTests
         await service.Sync(options);
 
         // Assert - no exceptions thrown
+    }
+
+    [Fact]
+    public async Task Sync_WithDeleteEnabled_DeletesOrphanedS3Files()
+    {
+        // Arrange
+        using var fixture = new FileSystemTestFixture();
+        fixture.CreateFile("local.txt", "local content");
+
+        // S3 has a file that doesn't exist locally
+        var s3Objects = S3ObjectList()
+            .AddObject("orphaned.txt", "somehash")
+            .Build();
+
+        var mockClient = CreateMockS3Client()
+            .SetupListObjectsV2AsyncWithOkResponse(s3Objects)
+            .SetupPutObjectAsyncWithOkResponse()
+            .SetupDeleteObjectsAsyncWithOkResponse();
+
+        var service = CreateService(mockClient);
+        var options = Options()
+            .WithRoot(fixture.RootDirectory)
+            .WithBucket("bucket")
+            .WithDelete()
+            .Build();
+
+        // Act
+        await service.Sync(options);
+
+        // Assert - DeleteObjectsAsync was called with the orphaned file
+        mockClient.Verify(x => x.DeleteObjectsAsync(
+            It.Is<DeleteObjectsRequest>(r =>
+                r.Objects.Count == 1 &&
+                r.Objects[0].Key == "orphaned.txt"),
+            CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task Sync_WithDeleteDisabled_DoesNotDeleteOrphanedS3Files()
+    {
+        // Arrange
+        using var fixture = new FileSystemTestFixture();
+        fixture.CreateFile("local.txt", "local content");
+
+        // S3 has a file that doesn't exist locally
+        var s3Objects = S3ObjectList()
+            .AddObject("orphaned.txt", "somehash")
+            .Build();
+
+        var mockClient = CreateMockS3Client()
+            .SetupListObjectsV2AsyncWithOkResponse(s3Objects)
+            .SetupPutObjectAsyncWithOkResponse();
+
+        var service = CreateService(mockClient);
+        var options = Options()
+            .WithRoot(fixture.RootDirectory)
+            .WithBucket("bucket")
+            .WithDelete(false)
+            .Build();
+
+        // Act
+        await service.Sync(options);
+
+        // Assert - DeleteObjectsAsync was never called
+        mockClient.Verify(x => x.DeleteObjectsAsync(
+            It.IsAny<DeleteObjectsRequest>(),
+            CancellationToken.None), Times.Never);
+    }
+
+    [Fact]
+    public async Task Sync_WithDeleteAndDryRun_DoesNotActuallyDelete()
+    {
+        // Arrange
+        using var fixture = new FileSystemTestFixture();
+        fixture.CreateFile("local.txt", "local content");
+
+        // S3 has a file that doesn't exist locally
+        var s3Objects = S3ObjectList()
+            .AddObject("orphaned.txt", "somehash")
+            .Build();
+
+        var mockClient = CreateMockS3Client()
+            .SetupListObjectsV2AsyncWithOkResponse(s3Objects);
+
+        var service = CreateService(mockClient);
+        var options = Options()
+            .WithRoot(fixture.RootDirectory)
+            .WithBucket("bucket")
+            .WithDelete()
+            .WithDryRun()
+            .Build();
+
+        // Act
+        await service.Sync(options);
+
+        // Assert - DeleteObjectsAsync was never called due to dry run
+        mockClient.Verify(x => x.DeleteObjectsAsync(
+            It.IsAny<DeleteObjectsRequest>(),
+            CancellationToken.None), Times.Never);
     }
 
     #endregion

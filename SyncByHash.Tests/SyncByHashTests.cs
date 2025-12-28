@@ -86,13 +86,9 @@ public partial class SyncByHashTests : TestBase
     public async Task GetKeysToHashesFromBucket_WithPrefix_PassesPrefixToRequest()
     {
         // Arrange
-        var (service, mockClient) = CreateServiceWithMock();
-        mockClient.Setup(x => x.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), CancellationToken.None))
-            .ReturnsAsync(new ListObjectsV2Response
-            {
-                HttpStatusCode = HttpStatusCode.OK,
-                S3Objects = []
-            });
+        var mockClient = CreateMockS3Client()
+            .SetupListObjectsV2AsyncWithOkResponse();
+        var service = CreateService(mockClient);
 
         // Act
         await service.GetKeysToHashesFromBucket("test-bucket", "prefix/");
@@ -107,13 +103,9 @@ public partial class SyncByHashTests : TestBase
     public async Task GetKeysToHashesFromBucket_WithDelimiter_PassesDelimiterToRequest()
     {
         // Arrange
-        var (service, mockClient) = CreateServiceWithMock();
-        mockClient.Setup(x => x.ListObjectsV2Async(It.IsAny<ListObjectsV2Request>(), CancellationToken.None))
-            .ReturnsAsync(new ListObjectsV2Response
-            {
-                HttpStatusCode = HttpStatusCode.OK,
-                S3Objects = []
-            });
+        var mockClient = CreateMockS3Client()
+            .SetupListObjectsV2AsyncWithOkResponse();
+        var service = CreateService(mockClient);
 
         // Act
         await service.GetKeysToHashesFromBucket("test-bucket", null, "/");
