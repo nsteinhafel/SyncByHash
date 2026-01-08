@@ -2,8 +2,6 @@
 
 Fast S3 sync utility that uses content hashes (MD5) instead of timestamps to determine which files need uploading.
 
-> **Note**: This is a work-in-progress tool created for personal use. Use at your own risk.
-
 ## Why?
 
 AWS CLI's `aws s3 sync` compares timestamps and file sizes, often triggering unnecessary uploads. SyncByHash compares MD5 hashes of local files against S3 ETags to upload only what's actually changed.
@@ -11,8 +9,7 @@ AWS CLI's `aws s3 sync` compares timestamps and file sizes, often triggering unn
 ## Features
 
 - **Hash-based comparison**: Only uploads files that have actually changed
-- **Native AOT compilation**: Single 14MB executable, no .NET runtime required
-- **Fast startup**: Native binary with minimal overhead
+- **Native AOT compilation**: Single small executable, no .NET runtime required, fast startup
 - **Dry run mode**: Preview changes before executing
 - **Prefix/delimiter support**: Sync subsets of your bucket
 - **Force mode**: Re-upload everything regardless of hash
@@ -78,4 +75,4 @@ syncbyhash ./dist my-bucket --prefix cdn/v2/
 
 ## License
 
-MIT
+MIT License. See [LICENSE](LICENSE) for details.
